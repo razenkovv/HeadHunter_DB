@@ -5,56 +5,71 @@ from (select win_side, count(id) as c
       from matches
       group by win_side
       order by c desc
-      limit 1) as wsc
+      limit 1) as wsc;
+
 
 --2.Герой с атрибутом "strength", который был в наибольшем числе игр
 
-select name from
-(select name, count(match_id) as c from
-(select * from
-(select name,
-       description,
-       hh1.id             as hh_id,
-       side,
-       match_id,
-       hero_id
-from (select name, description, heroes.id
-      from heroes
-               join attributes on heroes.attribute = attributes.id
-      where attributes.attribute = 'strength') as hh1
-         join player_matches on hh1.id = player_matches.hero_id) as hh2
-join matches on match_id = matches.id) as hh3
-group by (name)
-order by c desc
-limit 1) as hh4;
+select name
+from (select name, count(match_id) as c
+      from (select *
+            from (select name,
+                         description,
+                         hh1.id as hh_id,
+                         side,
+                         match_id,
+                         hero_id
+                  from (select name, description, heroes.id
+                        from heroes
+                                 join attributes on heroes.attribute = attributes.id
+                        where attributes.attribute = 'strength') as hh1
+                           join players_matches on hh1.id = players_matches.hero_id) as hh2
+                     join matches on match_id = matches.id) as hh3
+      group by (name)
+      order by c desc
+      limit 1) as hh4;
+
 
 --3.Средняя длительность игр
 
-select avg(duration) from matches;
+select avg(duration)
+from matches;
+
 
 --4.Вывести количество игр за каждый год
 
-select count(time), extract(year from time) as year from matches
-group by time;
+select count(time), extract(year from time) as year
+from matches
+group by year
+order by year;
+
 
 --5. Вывести 10 самых дорогих предметов
 
-select name, cost from skins
+select name, cost
+from skins
 order by cost desc
 limit 10;
 
+
 --6. Вывести игроков, у которых суммарная стоимость предметов в инвентаре превышает Х
 
-select player_id, sum_cost from
-(select player_id, sum(cost) as sum_cost from
-(select player_id, cost from
-possesions join skins on possesions.skin_id = skins.id) as hh1
-group by player_id) as hh2
-where sum_cost > 10;
+select players.name, sum_cost
+from (select player_id, sum_cost
+      from (select player_id, sum(cost) as sum_cost
+            from (select player_id, cost
+                  from possesions
+                           join skins on possesions.skin_id = skins.id) as hh1
+            group by player_id) as hh2
+      where sum_cost > 260000) as hh3
+         join players on player_id = players.id
+order by sum_cost desc;
+
 
 --7. Для каждого игрока вывести героя с наибольшим % побед
 
-select player_id, hero_id, percent as victory_percent
+select players.name as player, heroes.name as hero, victory_percent from
+(select player_id, hero_id, percent as victory_percent
 from (select player_id,
              hero_id,
              percent,
@@ -69,16 +84,17 @@ from (select player_id,
                   from (select count(*) as c_win, hero_id, player_id
                         from (select hero_id, player_id
                               from matches
-                                       join player_matches on matches.id = player_matches.match_id
+                                       join players_matches on matches.id = players_matches.match_id
                               where win_side = side) as hh
                         group by (hero_id, player_id)) as hh2
                            full outer join(select count(*) as c_defeat, hero_id, player_id
                                            from (select hero_id, player_id
                                                  from matches
-                                                          join player_matches on matches.id = player_matches.match_id
+                                                          join players_matches on matches.id = players_matches.match_id
                                                  where win_side != side) as hh3
                                            group by (hero_id, player_id)) as hh4
                                           on (hh2.player_id = hh4.player_id and hh2.hero_id = hh4.hero_id)) as hh5) as hh6) as hh7
-where percent = m
-order by player_id;
-
+where percent = m) as hh8
+join players on player_id = players.id
+join heroes on hero_id = heroes.id
+order by victory_percent desc;
